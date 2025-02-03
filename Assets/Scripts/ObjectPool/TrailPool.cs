@@ -1,4 +1,5 @@
 using Cysharp.Threading.Tasks;
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.AddressableAssets;
@@ -11,15 +12,25 @@ public class TrailPool : MonoBehaviour
     private Queue<GameObject> pool = new();
     private GameObject trailPrefab;
     private AsyncOperationHandle<GameObject> trailHandle;
-    private bool isLoaded = false;
-    private async void Start()
+    private bool isPrefabLoaded = false;
+    public event Action OnPrefabLoaded;
+    private void Awake()
     {
+        LoadPrefabAsync().Forget();
+    }
+    private void OnDestroy()
+    {
+        Addressables.Release(trailHandle);
+    }
+    private async UniTaskVoid LoadPrefabAsync()
+	{
         trailHandle = Addressables.LoadAssetAsync<GameObject>(trailPrefabReference);
         await trailHandle.Task;
         if (trailHandle.Status == AsyncOperationStatus.Succeeded)
-        {
+		{
             trailPrefab = trailHandle.Result;
-            isLoaded = true;
+            isPrefabLoaded = true;
+            OnPrefabLoaded?.Invoke();
             for (int i = 0; i < poolSize; i++)
             {
                 GameObject trail = Instantiate(trailPrefab, transform);
@@ -32,15 +43,16 @@ public class TrailPool : MonoBehaviour
             Debug.LogError("Failed to load trail prefab from addressable");
         }
     }
-    private void OnDestroy()
-    {
-        Addressables.Release(trailHandle);
-    }
     public async UniTask<GameObject> GetTrail()
     {
-        if (!isLoaded)
+        if (!isPrefabLoaded)
         {
-            await UniTask.WaitUntil(() => isLoaded);
+            var taskCompletionSource = new UniTaskCompletionSource();
+            OnPrefabLoaded += () =>
+            {
+                taskCompletionSource.TrySetResult();
+            };
+            await taskCompletionSource.Task;
         }
         if (trailPrefab == null) return null;
         if (pool.Count > 0)
