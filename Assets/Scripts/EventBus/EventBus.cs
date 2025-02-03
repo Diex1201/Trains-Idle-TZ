@@ -3,32 +3,33 @@ using System.Collections.Generic;
 
 public class EventBus
 {
-    private readonly Dictionary<Type, List<Action<object>>> eventHandlers = new();
+    private readonly Dictionary<Type, List<Delegate>> eventHandlers = new();
     public void Subscribe<T>(Action<T> handler)
     {
-        Type eventType = typeof(T);
-        if (!eventHandlers.ContainsKey(eventType))
+        Type eventType = typeof(T); 
+        if (!eventHandlers.ContainsKey(eventType)) 
         {
-            eventHandlers[eventType] = new();
+            eventHandlers[eventType] = new(); 
         }
-        eventHandlers[eventType].Add(obj => handler((T)obj));
+        eventHandlers[eventType].Add(handler);
     }
     public void Unsubscribe<T>(Action<T> handler)
     {
-        Type eventType = typeof(T);
+        Type eventType = typeof(T); 
         if (eventHandlers.ContainsKey(eventType))
         {
-            eventHandlers[eventType].Remove(obj => handler((T)obj));
+            eventHandlers[eventType].Remove(handler);
         }
     }
     public void Publish<T>(T message)
     {
-        Type eventType = typeof(T);
+        Type eventType = typeof(T); 
         if (eventHandlers.ContainsKey(eventType))
         {
             foreach (var handler in eventHandlers[eventType])
             {
-                handler(message);
+                if(handler is Action<T> action)
+                action(message);
             }
         }
     }
